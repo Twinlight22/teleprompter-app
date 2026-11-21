@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>テレプロンプター</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark;--lime:#c2f881;--line:#363a39;--muted:#a4ada8}
+body{margin:0;background:#101211;color:#f5f7f4;font:16px/1.6 system-ui,"Hiragino Sans",sans-serif}
+header,main{max-width:1240px;margin:auto;padding:0 clamp(16px,4vw,58px)}
+header{display:flex;align-items:center;gap:13px;padding-top:26px;padding-bottom:24px}
+h1{font-size:clamp(20px,3vw,26px);margin:0;letter-spacing:.035em}
+.logo{width:39px;height:34px;display:grid;place-items:center;background:var(--lime);color:#20271c;border-radius:9px}
+svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:none}
+main{padding-bottom:32px}
+.deck,.card{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#1a1d1b}
+.bar,.controls,.heading,.row,button,.state{display:flex;align-items:center}
+.bar{justify-content:space-between;padding:11px 18px;gap:10px}
+.heading{gap:9px;font-size:15px;font-weight:700;margin:0}
+.heading svg{color:var(--lime)}
+button{font:inherit;font-size:14px;font-weight:650;gap:8px;justify-content:center;cursor:pointer;color:inherit;background:#272b28;border:1px solid #414742;border-radius:8px;min-height:40px;padding:7px 14px}
+button:hover{filter:brightness(1.16)}
+:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.stage{position:relative;overflow:hidden;background:#050605;height:clamp(240px,33vh,390px);border-block:1px solid var(--line);--marker-inset:14px}
+.stage{background-image:linear-gradient(var(--lime),var(--lime));background-size:calc(100% - 2 * var(--marker-inset)) 1px;background-position:center;background-repeat:no-repeat}
+.stage:before,.stage:after{content:"";position:absolute;left:14px;top:50%;border:6px solid transparent;border-left:9px solid var(--lime);z-index:1;transform:translateY(-50%)}
+.stage:after{left:auto;right:14px;border-left:6px solid transparent;border-right:9px solid var(--lime)}
+.mirror{height:100%}.flipped{transform:scaleX(-1)}
+#copy{margin:0 auto;width:85%;max-width:1020px;font-size:44px;line-height:1.55;font-weight:680;white-space:pre-wrap;overflow-wrap:anywhere;will-change:transform}
+@supports (background-clip:text) or (-webkit-background-clip:text){
+  #copy{
+    background-image:linear-gradient(to bottom,#f5f7f4 var(--line-start),var(--lime) var(--line-start),var(--lime) var(--line-end),#f5f7f4 var(--line-end));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+}
+@media(forced-colors:active){#copy{background:none;color:CanvasText}}
+.controls{padding:14px 18px;gap:10px;flex-wrap:wrap}
+.primary{background:var(--lime);color:#1c2517;border-color:var(--lime);min-width:125px}
+.state{gap:8px;color:var(--muted);font-size:13px;margin-left:auto}
+.dot{width:8px;height:8px;border-radius:50%;background:#919992}.playing .dot{background:var(--lime)}
+.grid{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-top:16px}
+.card{padding:20px}.card .heading{margin-bottom:14px}
+textarea{display:block;width:100%;height:155px;resize:vertical;background:#111412;color:#f4f6f3;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font:inherit;line-height:1.7}
+.note{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;margin:10px 0 0}.note svg{width:15px;height:15px}
+.row{justify-content:space-between;font-size:14px;font-weight:600;gap:8px}
+output{font:600 13px ui-monospace,monospace;color:var(--lime)}
+input[type=range]{display:block;width:100%;accent-color:var(--lime);margin:6px 0 13px;cursor:pointer}
+.toggle{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer}.toggle input{width:38px;height:21px;margin:0;appearance:none;background:#424843;border-radius:20px;cursor:pointer}
+.toggle input:before{content:"";display:block;width:15px;height:15px;margin:3px;background:white;border-radius:50%}.toggle input:checked{background:var(--lime)}.toggle input:checked:before{transform:translateX(17px);background:#24301c}
+.last{border-top:1px solid var(--line);padding-top:12px}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:17px}kbd{border:1px solid #454b46;border-radius:4px;padding:2px 6px;margin-right:5px}
+.deck:fullscreen,.deck.expanded{display:flex;flex-direction:column;background:#101210;border-radius:0}.deck.expanded{position:fixed;inset:0;z-index:10}.deck:fullscreen .stage,.deck.expanded .stage{flex:1}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.card{padding:16px}.controls{padding:12px;gap:7px}button{padding:7px 10px}.primary{min-width:105px}.bar{padding:9px 12px}.stage{--marker-inset:4px}.stage:before{left:4px}.stage:after{right:4px}}
+</style>
+</head>
+<body>
+<header><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="15" rx="3"/><path d="M7 8h10M7 12h7M9 21h6"/></svg></span><h1>テレプロンプター</h1></header>
+<main>
+<section class="deck" id="deck" aria-label="プロンプター">
+<div class="bar"><h2 class="heading">プレビュー</h2><button id="full"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/></svg><span>全画面</span></button></div>
+<div class="stage" id="stage"><div class="mirror" id="mirrorView"><div id="copy"></div></div></div>
+<div class="controls"><button class="primary" id="play"><span id="playIcon" aria-hidden="true">▶</span><span id="playText">スタート</span></button><button id="reset"><span aria-hidden="true">↶</span>先頭に戻す</button><span class="state" role="status" id="state"><i class="dot"></i><span id="statusText">待機中</span></span></div>
+</section>
+<div class="grid"><section class="card"><h2 class="heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7m-7 4h5"/></svg><label for="script">原稿</label></h2>
+<textarea id="script" spellcheck="false" autocomplete="off" placeholder="ここに原稿を貼り付けてください">みなさん、こんにちは。
+本日はお集まりいただき、ありがとうございます。
+
+ここに原稿を貼り付けて、読み始めましょう。</textarea>
+<p class="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span id="saveNote">原稿はこのブラウザ内に保存されます。</span></p></section>
+<section class="card"><h2 class="heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h8m5 0h5M3 17h3m5 0h10"/><circle cx="13" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>表示設定</h2>
+<div class="row"><label for="speed">スクロール速度</label><output id="speedOut" for="speed"></output></div><input id="speed" type="range" min="5" max="180" value="45">
+<div class="row"><label for="size">文字サイズ</label><output id="sizeOut" for="size"></output></div><input id="size" type="range" min="20" max="100" value="44">
+<div class="row last"><label for="mirror">ミラー表示（左右反転）</label><span class="toggle"><input type="checkbox" id="mirror"></span></div></section></div>
+<footer><kbd>スペース</kbd>で再生・一時停止</footer>
+</main>
+<script>
+'use strict';
+const el = id => document.getElementById(id);
+const editor = el('script'), copy = el('copy'), stage = el('stage'), deck = el('deck');
+const storageKey = 'teleprompter.script.v1';
+function storageError() { el('saveNote').textContent = '保存できませんでした。閉じる前に原稿をコピーしてください。'; }
+try {
+  const saved = localStorage.getItem(storageKey);
+  if (saved !== null) editor.value = saved;
+} catch { storageError(); }
+let distance = 0, running = false, finished = false, frame = 0, previous = null;
+function draw() {
+  const lineHeight = parseFloat(getComputedStyle(copy).lineHeight);
+  const top = stage.clientHeight / 2 - lineHeight / 2 - distance;
+  const lineStart = Math.round(distance / lineHeight) * lineHeight;
+  copy.style.setProperty('--line-start', lineStart + 'px');
+  copy.style.setProperty('--line-end', (lineStart + lineHeight) + 'px');
+  copy.style.transform = 'translateY(' + top + 'px)';
+  return top + copy.offsetHeight;
+}
+function setPlayback(active, label) {
+  running = active;
+  el('playText').textContent = active ? '一時停止' : 'スタート';
+  el('playIcon').textContent = active ? 'Ⅱ' : '▶';
+  el('statusText').textContent = label;
+  el('state').classList.toggle('playing', active);
+  cancelAnimationFrame(frame);
+  previous = null;
+}
+function reset() {
+  distance = 0;
+  finished = false;
+  setPlayback(false, editor.value.trim() ? '待機中' : '原稿を入力してください');
+  draw();
+}
+function advance(now) {
+  if (!running) return;
+  if (previous !== null) distance += Math.min(now - previous, 100) * Number(el('speed').value) / 1000;
+  previous = now;
+  if (draw() <= 0) {
+    finished = true;
+    setPlayback(false, '再生終了');
+  } else frame = requestAnimationFrame(advance);
+}
+function toggle() {
+  if (running) return setPlayback(false, '一時停止中');
+  if (!editor.value.trim()) return reset();
+  if (finished) reset();
+  setPlayback(true, '再生中');
+  frame = requestAnimationFrame(advance);
+}
+function updateSettings() {
+  el('speedOut').textContent = el('speed').value + ' px/秒';
+  el('sizeOut').textContent = el('size').value + ' px';
+  copy.style.fontSize = el('size').value + 'px';
+  draw();
+}
+editor.addEventListener('input', () => {
+  copy.textContent = editor.value;
+  reset();
+  try { localStorage.setItem(storageKey, editor.value); el('saveNote').textContent = 'このブラウザに保存しました。'; } catch { storageError(); }
+});
+el('play').onclick = toggle;
+el('reset').onclick = reset;
+el('speed').oninput = el('size').oninput = updateSettings;
+el('mirror').onchange = event => el('mirrorView').classList.toggle('flipped', event.target.checked);
+function fullLabel() {
+  el('full').querySelector('span').textContent = document.fullscreenElement || deck.classList.contains('expanded') ? '全画面を終了' : '全画面';
+  draw();
+}
+el('full').onclick = async () => {
+  if (document.fullscreenElement) await document.exitFullscreen();
+  else if (deck.classList.contains('expanded')) deck.classList.remove('expanded');
+  else {
+    try { await deck.requestFullscreen(); } catch { deck.classList.add('expanded'); }
+  }
+  fullLabel();
+};
+document.addEventListener('fullscreenchange', fullLabel);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && deck.classList.contains('expanded')) { deck.classList.remove('expanded'); fullLabel(); }
+  if (event.code !== 'Space' || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.target.matches('textarea,input')) return;
+  event.preventDefault();
+  if (!event.repeat) toggle();
+});
+window.addEventListener('resize', draw);
+copy.textContent = editor.value;
+updateSettings();
+reset();
+</script>
+</body>
+</html>
